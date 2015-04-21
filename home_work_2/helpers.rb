@@ -19,10 +19,10 @@ module Helpers
       @browser.find_element(name: 'commit').click
     end
 
-    def sing_in_as(login, password)
+    def sing_in_as(user)
       @browser.find_element(class: 'login').click
-      @browser.find_element(id: 'username').send_keys login
-      @browser.find_element(id: 'password').send_keys @password
+      @browser.find_element(id: 'username').send_keys user.login
+      @browser.find_element(id: 'password').send_keys user.password
       @browser.find_element(name: 'login').click
     end
 
@@ -30,16 +30,30 @@ module Helpers
       @browser.find_element(class: 'logout').click
     end
 
-    def change_password(password, new_password)
+    def change_password(user)
       @browser.find_element(:xpath, ".//*[@id='account']/ul/li[1]/a").click
       sleep 3
       @browser.find_element(:css, ".icon.icon-passwd").click
-      @browser.find_element(id: 'password').send_keys password
+      @browser.find_element(id: 'password').send_keys user.password
+      new_password = user.password + 44
       @browser.find_element(id: 'new_password').send_keys new_password
       @browser.find_element(id: 'new_password_confirmation').send_keys new_password
       @browser.find_element(name: 'commit').click
     end
 
+    def edit_user_role(user)
+      sleep 2
+      @browser.find_element(:css, '.user.active').click
+      @browser.find_element(:xpath, "//*[@id='content']//ul[2]/li/a").click
+      sleep 2
+      @browser.find_element(:css, ".settings").click
+      @browser.find_element(:id, 'tab-members').click
+      sleep 2
+      @browser.find_element(:xpath, "//a[text()='#{user.full_name}']/ancestor::td[@class='name user']/following-sibling::td[@class='buttons']/a[@class='icon icon-edit']").click
+      @browser.find_element(:xpath, "//a[text()='#{user.full_name}']/ancestor::td[@class='name user']/following-sibling::td[@class='roles']//p[1]//input[@value=4]").click
+      @browser.find_element(:xpath, "//a[text()='#{user.full_name}']/ancestor::td[@class='name user']/following-sibling::td[@class='roles']//p[2]/input[@name='commit']").click
+      sleep 2
+    end
   end
 
   module ProjectActions
@@ -62,20 +76,41 @@ module Helpers
       fail 'Test is failed' unless @browser.find_element(id: 'flash_notice').text == 'Successful creation.'
     end
 
-      issue_value = [1, 2, 3]
-      issue_name = ['Bug #1', 'Feature #1', 'Support ticket #1']
+    def add_member(user)
+      #@browser.find_element(class: 'settings').click
+      sleep 2
+      @browser.find_element(:css, '.user.active').click
+      @browser.find_element(:xpath, "//*[@id='content']//ul[2]/li/a").click
+      @browser.find_element(:css, ".settings").click
+      sleep 3
+      @browser.find_element(:xpath, ".//*[@id='tab-members']").click
+      @browser.find_element(:css, ".icon.icon-add").click
+      @browser.find_element(id: 'principal_search').send_keys user.full_name
+      sleep 5
+      @browser.find_element(name: 'membership[user_ids][]').click
+      @browser.find_element(:xpath, ".//*[@id='new_membership']/fieldset[2]/div/label[3]/input").click
+      @browser.find_element(id: 'member-add-submit').click
+    end
 
-    def add_issue(issue_value, issue_name)
-      issue_value.zip(issue_name).each do |value, name|
-         sleep 3
-        option = Selenium::WebDriver::Support::Select.new(@browser.find_element(id: 'issue_tracker_id'))
-        option.select_by(:value, value)
+    def add_issue(issues_hash, user)
+      issues_hash.each do |value, ticket_name|
         sleep 3
-        @browser.find_element(id: 'issue_subject').send_keys name
+        @browser.find_element(:css, '.user.active').click
+        @browser.find_element(:xpath, "//*[@id='content']//ul[2]/li/a").click
+        @browser.find_element(class: 'new-issue').click
+        option = Selenium::WebDriver::Support::Select.new(@browser.find_element(id: 'issue_tracker_id'))
+        if value == '1'
+          option.first_selected_option
+        else
+          option.select_by(:value, value)
+        end
+        sleep 3
+        @browser.find_element(id: 'issue_subject').send_keys ticket_name
         @browser.find_element(id: 'issue_description').send_keys 'test'
         assignee = Selenium::WebDriver::Support::Select.new(@browser.find_element(id: 'issue_assigned_to_id'))
-        assignee.select_by(:text, 'John Doe')
+        assignee.select_by(:text, "#{user.full_name}")
         @browser.find_element(name: 'commit').click
+        sleep 3
       end
     end
   end
@@ -86,16 +121,14 @@ module Helpers
     end
 
     def go_to_issues_page
+      @browser.find_element(:css, '.user.active').click
+      @browser.find_element(:xpath, "//*[@id='content']//ul[2]/li/a").click
       @browser.find_element(class: 'issues').click
-    end
-
-    def go_to_issue_adding_page
-      @browser.find_element(class: 'new-issue').click
     end
   end
 
   module Validate
-    def successfull_registration
+    def successful_registration
       fail 'Test is failed' unless @browser.find_element(id: 'flash_notice').text == 'Your account has been activated. You can now log in.'
     end
 
@@ -105,6 +138,12 @@ module Helpers
 
     def checking_flash_for_project
       fail 'Test is failed' unless @browser.find_element(id: 'flash_notice').text == 'Successful creation.'
+    end
+
+    def displaying_ticket(issues_hash)
+      issues_hash.each_value do |value|
+        fail 'Test is failed' unless @browser.find_element(link: value).displayed?
+      end
     end
   end
 end
